@@ -2,13 +2,9 @@
 import { ChangeEvent, useRef, useState } from "react";
 
 type Question = {
-  id: number;
-  text: string;
-  options: {
-    id: number;
-    text: string;
-    isCorrect: boolean;
-  }[];
+  question: string;
+  options: string[];
+  correctAnswer: number;
 };
 
 export default function Home() {
@@ -19,27 +15,7 @@ export default function Home() {
     Record<number, number>
   >({});
 
-  // Пример данных теста
-  const [questions, setQuestions] = useState<Question[]>([
-    {
-      id: 1,
-      text: "Что нужно вставить в предложение?",
-      options: [
-        { id: 1, text: "was", isCorrect: false },
-        { id: 2, text: "are", isCorrect: false },
-        { id: 3, text: "is", isCorrect: true },
-      ],
-    },
-    {
-      id: 2,
-      text: "Что нужно вставить в предложение?",
-      options: [
-        { id: 1, text: "was", isCorrect: false },
-        { id: 2, text: "are", isCorrect: true },
-        { id: 3, text: "am", isCorrect: false },
-      ],
-    },
-  ]);
+  const [questions, setQuestions] = useState<Question[]>([]);
 
   const handleChange = (e: ChangeEvent<HTMLTextAreaElement>) => {
     setText(e.target.value);
@@ -49,9 +25,27 @@ export default function Home() {
     }
   };
 
-  const handleCreateTest = () => {
-    // Здесь могла бы быть логика создания теста на основе введенного текста
-    setTestCreated(true);
+  const handleCreateTest = async () => {
+    try {
+      const response = await fetch("http://localhost:5000/api/quiz/generate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ topic: text }), // `text` — это введенная тема
+      });
+
+      if (!response.ok) {
+        throw new Error("Ошибка при генерации теста");
+      }
+
+      const data = await response.json();
+      setQuestions(data.quiz); // Обновляем вопросы с бэкенда
+      setTestCreated(true);
+    } catch (error) {
+      console.error("Error:", error);
+      alert("Не удалось создать тест. Попробуйте еще раз.");
+    }
   };
 
   const handleAnswerSelect = (questionId: number, optionId: number) => {
@@ -63,13 +57,9 @@ export default function Home() {
 
   const checkAnswers = () => {
     let correctCount = 0;
-    questions.forEach((question) => {
-      const selectedOptionId = selectedAnswers[question.id];
-      if (selectedOptionId) {
-        const selectedOption = question.options.find(
-          (opt) => opt.id === selectedOptionId
-        );
-        if (selectedOption?.isCorrect) correctCount++;
+    questions.forEach((question, index) => {
+      if (selectedAnswers[index] === question.correctAnswer) {
+        correctCount++;
       }
     });
     alert(
@@ -115,29 +105,23 @@ export default function Home() {
               Тест на тему Present Simple:
             </h2>
 
-            {questions.map((question) => (
-              <div key={question.id} className="mb-6 last:mb-0">
+            {questions.map((question, qIndex) => (
+              <div key={qIndex} className="mb-6 last:mb-0">
                 <h3 className="text-lg font-medium mb-2">
-                  {question.id}. {question.text}
+                  {qIndex + 1}. {question.question}
                 </h3>
                 <ul className="space-y-2">
-                  {question.options.map((option) => (
-                    <li key={option.id} className="flex items-center">
+                  {question.options.map((option, optIndex) => (
+                    <li key={optIndex} className="flex items-center">
                       <input
                         type="radio"
-                        id={`q${question.id}-o${option.id}`}
-                        name={`question-${question.id}`}
-                        checked={selectedAnswers[question.id] === option.id}
-                        onChange={() =>
-                          handleAnswerSelect(question.id, option.id)
-                        }
+                        name={`question-${qIndex}`}
+                        checked={selectedAnswers[qIndex] === optIndex}
+                        onChange={() => handleAnswerSelect(qIndex, optIndex)}
                         className="mr-2 h-4 w-4 text-blue-600 focus:ring-blue-500"
                       />
-                      <label
-                        htmlFor={`q${question.id}-o${option.id}`}
-                        className="text-gray-700 cursor-pointer hover:text-gray-900 text-lg"
-                      >
-                        {option.text}
+                      <label className="text-gray-700 cursor-pointer hover:text-gray-900 text-lg">
+                        {option}
                       </label>
                     </li>
                   ))}
